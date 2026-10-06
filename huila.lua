@@ -1,4 +1,4 @@
--- adopt_me_trade_exploit.lua v23
+-- adopt_me_trade_exploit.lua v6
 -- Updated for current Adopt Me build (October 2026)
 -- Trade path: ReplicatedStorage.adoptme_new_net.adoptme_new.modules.TradeHub
 
@@ -7,13 +7,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Удаление всех предыдущих UI (включая старые версии)
-for _, gui in pairs(PlayerGui:GetChildren()) do
-    if gui:IsA("ScreenGui") and (gui.Name == "TradeExploitUI" or gui.Name:match("Exploit") or gui.Name:match("Trade")) then
-        gui:Destroy()
-    end
+-- Удаление только предыдущих версий этого exploit UI
+if PlayerGui:FindFirstChild("TradeExploitUI") then
+    PlayerGui.TradeExploitUI:Destroy()
+    wait(0.3)
 end
-wait(0.3)
 
 -- ===== LOG SYSTEM =====
 local log_entries = {}
@@ -114,10 +112,10 @@ local function create_ui()
     ItemsCount.Parent = MainFrame
 
     local LogButton = Instance.new("TextButton")
-    LogButton.Size = UDim2.new(0, 140, 0, 32)
+    LogButton.Size = UDim2.new(0, 100, 0, 32)
     LogButton.Position = UDim2.new(0, 10, 1, -42)
     LogButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
-    LogButton.Text = "SHOW LOGS"
+    LogButton.Text = "LOGS"
     LogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     LogButton.Font = Enum.Font.GothamBold
     LogButton.TextSize = 11
@@ -126,6 +124,20 @@ local function create_ui()
     local LogButtonCorner = Instance.new("UICorner")
     LogButtonCorner.CornerRadius = UDim.new(0, 6)
     LogButtonCorner.Parent = LogButton
+
+    local DumpButton = Instance.new("TextButton")
+    DumpButton.Size = UDim2.new(0, 100, 0, 32)
+    DumpButton.Position = UDim2.new(0, 115, 1, -42)
+    DumpButton.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    DumpButton.Text = "DUMP"
+    DumpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DumpButton.Font = Enum.Font.GothamBold
+    DumpButton.TextSize = 11
+    DumpButton.Parent = MainFrame
+
+    local DumpButtonCorner = Instance.new("UICorner")
+    DumpButtonCorner.CornerRadius = UDim.new(0, 6)
+    DumpButtonCorner.Parent = DumpButton
 
     local CloseButton = Instance.new("TextButton")
     CloseButton.Size = UDim2.new(0, 32, 0, 32)
@@ -213,7 +225,7 @@ local function create_ui()
     CloseLogCorner.CornerRadius = UDim.new(0, 5)
     CloseLogCorner.Parent = CloseLogButton
 
-    return ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, CloseButton, CloseLogButton, CopyLogButton
+    return ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, DumpButton, CloseButton, CloseLogButton, CopyLogButton
 end
 
 -- ===== LOG RENDERING =====
@@ -272,7 +284,7 @@ end
 add_log("Exploit v2 initializing...", Color3.fromRGB(100, 255, 255))
 
 local success, err = pcall(function()
-    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, CloseButton, CloseLogButton, CopyLogButton = create_ui()
+    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, DumpButton, CloseButton, CloseLogButton, CopyLogButton = create_ui()
 
     add_log("UI created", Color3.fromRGB(100, 255, 100))
 
@@ -342,10 +354,54 @@ local success, err = pcall(function()
     -- Button handlers
     LogButton.MouseButton1Click:Connect(function()
         LogFrame.Visible = not LogFrame.Visible
-        LogButton.Text = LogFrame.Visible and "HIDE LOGS" or "SHOW LOGS"
         if LogFrame.Visible then
             refresh_logs(ScrollFrame)
         end
+    end)
+
+    DumpButton.MouseButton1Click:Connect(function()
+        add_log("=== DUMP STARTED ===", Color3.fromRGB(255, 140, 0))
+        DumpButton.Text = "DUMPING..."
+
+        -- Dump PlayerGui structure
+        add_log("--- PlayerGui Dump ---", Color3.fromRGB(100, 255, 255))
+        for _, gui in pairs(PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and (gui.Name:lower():find("trade") or gui.Name:lower():find("shop")) then
+                add_log("ScreenGui: " .. gui.Name, Color3.fromRGB(255, 255, 100))
+                for _, child in pairs(gui:GetDescendants()) do
+                    if child:IsA("Frame") or child:IsA("TextButton") or child:IsA("ImageButton") then
+                        add_log("  " .. child.ClassName .. ": " .. child:GetFullName():gsub("Players%." .. LocalPlayer.Name .. "%.PlayerGui%.", ""), Color3.fromRGB(200, 200, 200))
+                    end
+                end
+            end
+        end
+
+        -- Dump ReplicatedStorage RemoteEvents
+        add_log("--- ReplicatedStorage Remotes ---", Color3.fromRGB(100, 255, 255))
+        local function scan_remotes(parent, depth)
+            if depth > 4 then return end
+            for _, child in pairs(parent:GetChildren()) do
+                if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                    if child:GetFullName():lower():find("trade") then
+                        add_log("Remote: " .. child:GetFullName():gsub("ReplicatedStorage%.", ""), Color3.fromRGB(100, 255, 100))
+                    end
+                elseif child:IsA("Folder") or child:IsA("ModuleScript") then
+                    scan_remotes(child, depth + 1)
+                end
+            end
+        end
+
+        if ReplicatedStorage:FindFirstChild("adoptme_new_net") then
+            add_log("Found: adoptme_new_net", Color3.fromRGB(255, 100, 255))
+            scan_remotes(ReplicatedStorage.adoptme_new_net, 0)
+        end
+
+        scan_remotes(ReplicatedStorage, 0)
+
+        add_log("=== DUMP COMPLETE ===", Color3.fromRGB(255, 140, 0))
+        DumpButton.Text = "DUMP"
+        LogFrame.Visible = true
+        refresh_logs(ScrollFrame)
     end)
 
     CloseButton.MouseButton1Click:Connect(function()
