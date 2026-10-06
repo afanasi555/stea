@@ -223,7 +223,7 @@ local success, err = pcall(function()
 
     local blocked_count = 0
 
-    -- ===== METAMETHOD HOOK — API.TradeAPI INTERCEPT =====
+    -- ===== METAMETHOD HOOK — PAYLOAD MANIPULATION =====
     local old_namecall
     old_namecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
@@ -252,35 +252,64 @@ local success, err = pcall(function()
                 add_log(call_signature, Color3.fromRGB(150, 150, 200))
                 LastAction.Text = "Last: " .. call_signature:sub(1, 50)
 
-                -- Extract remote name from path (API.TradeAPI/ConfirmTrade -> ConfirmTrade)
+                -- Extract remote name
                 local remote_name = remote_path:match("/([^/]+)$") or ""
 
-                -- CRITICAL INTERCEPT — ConfirmTrade and AcceptNegotiation ONLY
-                if remote_name == "ConfirmTrade" or remote_name == "AcceptNegotiation" then
-                    add_log("🔴🔴🔴 CRITICAL: " .. remote_name .. " BLOCKED", Color3.fromRGB(255, 0, 0))
+                -- STRATEGY: Intercept pet IDs and item data in ANY TradeAPI call
+                -- Don't block the call — let it go through, but modify the payload
 
-                    blocked_count = blocked_count + 1
-                    InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                    ItemsCount.Text = "BLOCKED: " .. remote_name
-                    ItemsCount.TextColor3 = Color3.fromRGB(255, 50, 50)
-                    add_log("✓ EMPTY CALL SENT TO SERVER", Color3.fromRGB(100, 255, 100))
-                    refresh_logs(ScrollFrame)
+                local modified = false
 
-                    -- Return with NO arguments — server receives empty trade
-                    return old_namecall(self)
+                -- 1. Remove pet IDs from arguments (pattern: "digit_32hexchars")
+                for i = 1, #args do
+                    if type(args[i]) == "string" and args[i]:match("^%d+_[a-f0-9]{32}$") then
+                        add_log("🔴 PET ID IN PAYLOAD: args[" .. i .. "] = " .. args[i]:sub(1, 20) .. "...", Color3.fromRGB(255, 100, 0))
+                        args[i] = nil
+                        modified = true
+                    end
                 end
 
-                -- FALLBACK: Pet ID pattern intercept (direct pet ID calls)
-                if type(args[1]) == "string" and args[1]:match("^%d+_[a-f0-9]{32}$") then
-                    add_log("🔴 PET ID DIRECT CALL: " .. args[1]:sub(1, 20) .. "...", Color3.fromRGB(255, 100, 0))
+                -- 2. Clear tables that contain item data (but keep structure for other data)
+                for i = 1, #args do
+                    if type(args[i]) == "table" then
+                        local has_items = false
+                        local item_count = 0
 
+                        -- Check if table contains pet/item data
+                        -- Heuristic: tables with string keys that look like IDs or have "pet"/"item" in keys
+                        for k, v in pairs(args[i]) do
+                            if type(k) == "string" or type(v) == "string" then
+                                if (type(k) == "string" and (k:find("pet") or k:find("item") or k:match("^%d+_"))) or
+                                   (type(v) == "string" and v:match("^%d+_[a-f0-9]+")) then
+                                    has_items = true
+                                    item_count = item_count + 1
+                                end
+                            end
+                        end
+
+                        if has_items then
+                            add_log("🔴 ITEM TABLE DETECTED: args[" .. i .. "] with " .. item_count .. " items", Color3.fromRGB(255, 100, 0))
+
+                            -- Clear only pet/item entries, keep other data
+                            for k, v in pairs(args[i]) do
+                                if type(v) == "string" and v:match("^%d+_[a-f0-9]+") then
+                                    args[i][k] = nil
+                                end
+                            end
+                            modified = true
+                        end
+                    end
+                end
+
+                if modified then
                     blocked_count = blocked_count + 1
-                    InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                    ItemsCount.Text = "BLOCKED: Pet ID"
-                    add_log("✓ Pet ID nullified", Color3.fromRGB(100, 255, 100))
+                    InterceptCount.Text = "Items Removed: " .. blocked_count
+                    ItemsCount.Text = "MODIFIED: " .. remote_name
+                    ItemsCount.TextColor3 = Color3.fromRGB(255, 200, 0)
+                    add_log("✓ PAYLOAD MODIFIED — pets removed, call proceeding", Color3.fromRGB(100, 255, 100))
                     refresh_logs(ScrollFrame)
 
-                    return old_namecall(self, nil)
+                    return old_namecall(self, unpack(args))
                 end
             end
         end
