@@ -1,6 +1,6 @@
--- adopt_me_trade_exploit.lua v3
--- Updated: 2026-10-06 | API.TradeAPI/ConfirmTrade intercept
--- Method: Metamethod hook on all TradeAPI FireServer calls
+-- adopt_me_trade_exploit.lua v10
+-- Updated: 2026-10-07 | Visual pet removal strategy
+-- Method: RemoveItemFromOffer after AddItemToOffer with UI preservation
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -53,11 +53,21 @@ local function create_ui()
     Header.Size = UDim2.new(1, 0, 0, 35)
     Header.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     Header.BorderSizePixel = 0
-    Header.Text = "ADOPT ME EXPLOIT V3"
+    Header.Text = "ADOPT ME EXPLOIT V10"
     Header.TextColor3 = Color3.fromRGB(255, 70, 70)
     Header.Font = Enum.Font.GothamBold
     Header.TextSize = 14
     Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 8)
+
+    local VersionLabel = Instance.new("TextLabel", Header)
+    VersionLabel.Size = UDim2.new(0, 100, 1, 0)
+    VersionLabel.Position = UDim2.new(1, -105, 0, 0)
+    VersionLabel.BackgroundTransparency = 1
+    VersionLabel.Text = "v10.2026"
+    VersionLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    VersionLabel.Font = Enum.Font.Code
+    VersionLabel.TextSize = 10
+    VersionLabel.TextXAlignment = Enum.TextXAlignment.Right
 
     local StatusLabel = Instance.new("TextLabel", MainFrame)
     StatusLabel.Size = UDim2.new(1, -20, 0, 25)
@@ -110,24 +120,34 @@ local function create_ui()
     LastAction.TextXAlignment = Enum.TextXAlignment.Left
 
     local LogButton = Instance.new("TextButton", MainFrame)
-    LogButton.Size = UDim2.new(0, 90, 0, 32)
+    LogButton.Size = UDim2.new(0, 70, 0, 32)
     LogButton.Position = UDim2.new(0, 10, 1, -42)
     LogButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
     LogButton.Text = "LOGS"
     LogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     LogButton.Font = Enum.Font.GothamBold
-    LogButton.TextSize = 11
+    LogButton.TextSize = 10
     Instance.new("UICorner", LogButton).CornerRadius = UDim.new(0, 6)
 
     local DumpButton = Instance.new("TextButton", MainFrame)
-    DumpButton.Size = UDim2.new(0, 90, 0, 32)
-    DumpButton.Position = UDim2.new(0, 105, 1, -42)
+    DumpButton.Size = UDim2.new(0, 70, 0, 32)
+    DumpButton.Position = UDim2.new(0, 85, 1, -42)
     DumpButton.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
     DumpButton.Text = "DUMP"
     DumpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     DumpButton.Font = Enum.Font.GothamBold
-    DumpButton.TextSize = 11
+    DumpButton.TextSize = 10
     Instance.new("UICorner", DumpButton).CornerRadius = UDim.new(0, 6)
+
+    local RemovePetButton = Instance.new("TextButton", MainFrame)
+    RemovePetButton.Size = UDim2.new(0, 100, 0, 32)
+    RemovePetButton.Position = UDim2.new(0, 160, 1, -42)
+    RemovePetButton.BackgroundColor3 = Color3.fromRGB(255, 50, 80)
+    RemovePetButton.Text = "REMOVE PET"
+    RemovePetButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    RemovePetButton.Font = Enum.Font.GothamBold
+    RemovePetButton.TextSize = 9
+    Instance.new("UICorner", RemovePetButton).CornerRadius = UDim.new(0, 6)
 
     local CloseButton = Instance.new("TextButton", MainFrame)
     CloseButton.Size = UDim2.new(0, 32, 0, 32)
@@ -190,7 +210,7 @@ local function create_ui()
     CloseLogButton.TextSize = 12
     Instance.new("UICorner", CloseLogButton).CornerRadius = UDim.new(0, 5)
 
-    return ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, InterceptCount, ItemsCount, LastAction, LogButton, DumpButton, CloseButton, CloseLogButton, CopyLogButton
+    return ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, InterceptCount, ItemsCount, LastAction, LogButton, DumpButton, RemovePetButton, CloseButton, CloseLogButton, CopyLogButton
 end
 
 -- ===== LOG RENDERING =====
@@ -217,13 +237,15 @@ end
 add_log("Exploit v3 starting...", Color3.fromRGB(100, 255, 255))
 
 local success, err = pcall(function()
-    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, InterceptCount, ItemsCount, LastAction, LogButton, DumpButton, CloseButton, CloseLogButton, CopyLogButton = create_ui()
+    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, InterceptCount, ItemsCount, LastAction, LogButton, DumpButton, RemovePetButton, CloseButton, CloseLogButton, CopyLogButton = create_ui()
 
     add_log("UI created", Color3.fromRGB(100, 255, 100))
 
     local blocked_count = 0
+    local last_pet_id = nil  -- Track last added pet ID
+    local trade_api_remote = nil  -- Store TradeAPI remote reference
 
-    -- ===== METAMETHOD HOOK — API.TradeAPI INTERCEPT =====
+    -- ===== METAMETHOD HOOK — FULL DIAGNOSTIC LOGGING =====
     local old_namecall
     old_namecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
@@ -234,85 +256,112 @@ local success, err = pcall(function()
 
             -- Only intercept TradeAPI calls
             if remote_path:find("TradeAPI") then
-                -- Log the full call signature for debugging
-                local call_signature = "TradeAPI"
+                -- Store remote reference for manual operations
+                if not trade_api_remote then
+                    trade_api_remote = self
+                end
+
+                -- Extract remote name
+                local remote_name = remote_path:match("/([^/]+)$") or "Unknown"
+
+                -- Track pet IDs from AddItemToOffer
+                if remote_name == "AddItemToOffer" then
+                    for i, arg in ipairs(args) do
+                        if type(arg) == "string" and arg:match("^%d+_[a-f0-9]{32}$") then
+                            last_pet_id = arg
+                            add_log("📌 Tracked Pet ID: " .. arg:sub(1, 20) .. "...", Color3.fromRGB(100, 255, 255))
+                        elseif type(arg) == "table" then
+                            for k, v in pairs(arg) do
+                                if type(v) == "string" and v:match("^%d+_[a-f0-9]{32}$") then
+                                    last_pet_id = v
+                                    add_log("📌 Tracked Pet ID: " .. v:sub(1, 20) .. "...", Color3.fromRGB(100, 255, 255))
+                                end
+                            end
+                        end
+                    end
+                end
+
+                -- Build FULL call signature with remote name
+                local call_signature = remote_name
+                local detailed_args = {}
+
                 for i, arg in ipairs(args) do
                     local arg_type = type(arg)
                     if arg_type == "string" then
-                        call_signature = call_signature .. "/" .. tostring(arg)
+                        local arg_str = tostring(arg)
+                        -- Truncate long strings but show full pet IDs
+                        if arg_str:match("^%d+_[a-f0-9]+$") then
+                            call_signature = call_signature .. "/PetID:" .. arg_str:sub(1, 15) .. "..."
+                            table.insert(detailed_args, "PetID: " .. arg_str)
+                        else
+                            call_signature = call_signature .. "/" .. arg_str:sub(1, 30)
+                            table.insert(detailed_args, "str: " .. arg_str:sub(1, 50))
+                        end
                     elseif arg_type == "table" then
                         local count = 0
-                        for _ in pairs(arg) do count = count + 1 end
+                        local has_pet_id = false
+                        for k, v in pairs(arg) do
+                            count = count + 1
+                            if type(v) == "string" and v:match("^%d+_[a-f0-9]+$") then
+                                has_pet_id = true
+                                table.insert(detailed_args, "table[" .. tostring(k) .. "]: " .. v)
+                            end
+                        end
                         call_signature = call_signature .. "/[table:" .. count .. "]"
+                        if has_pet_id then
+                            call_signature = call_signature .. "*PET"
+                        end
+                    elseif arg_type == "userdata" then
+                        call_signature = call_signature .. "/userdata"
+                        table.insert(detailed_args, "userdata: " .. tostring(arg))
                     else
                         call_signature = call_signature .. "/" .. arg_type
                     end
                 end
 
-                add_log(call_signature .. " intercepted", Color3.fromRGB(255, 100, 255))
-                LastAction.Text = "Last: " .. call_signature
-
-                -- CRITICAL: Block ANY FireServer to TradeAPI that contains pet IDs
-                -- Adopt Me structure: FireServer(pet_id_string) or FireServer(action, data_table)
-                -- Pet IDs are long hex strings like "2_cb36c1652e984c82a2b76cfcad47301d"
-
-                local blocked = false
-
-                -- Strategy 1: If args[1] is a long string with underscore and hex (pet ID pattern)
-                if type(args[1]) == "string" and #args[1] > 20 and args[1]:match("_[a-f0-9]+") then
-                    add_log("🔴 PET ID DETECTED: " .. args[1], Color3.fromRGB(255, 50, 50))
-                    args[1] = nil  -- Remove pet ID
-                    blocked = true
+                -- Log with color coding
+                local log_color = Color3.fromRGB(150, 150, 200)
+                if remote_name == "AddItemToOffer" or remote_name:find("Item") then
+                    log_color = Color3.fromRGB(255, 200, 100)
+                elseif remote_name == "ConfirmTrade" or remote_name == "AcceptNegotiation" then
+                    log_color = Color3.fromRGB(255, 150, 150)
                 end
 
-                -- Strategy 2: Scan all args for tables with pet data
-                for i = 1, #args do
-                    if type(args[i]) == "table" then
-                        local count = 0
-                        for k, v in pairs(args[i]) do
-                            count = count + 1
-                        end
+                add_log(call_signature, log_color)
+                LastAction.Text = "Last: " .. remote_name
 
-                        if count > 0 then
-                            add_log("TABLE PAYLOAD: args[" .. i .. "] has " .. count .. " items", Color3.fromRGB(255, 100, 0))
-
-                            -- Clear the table
-                            for k in pairs(args[i]) do
-                                args[i][k] = nil
-                            end
-                            blocked = true
-                        end
+                -- Log detailed args if they exist
+                if #detailed_args > 0 then
+                    for _, detail in ipairs(detailed_args) do
+                        add_log("  └─ " .. detail, Color3.fromRGB(120, 120, 150))
                     end
                 end
 
-                -- Strategy 3: If remote path ends with specific trade confirmation paths
-                -- Based on your dump: API.TradeAPI/ConfirmTrade is the actual remote
-                if remote_path:find("ConfirmTrade") or remote_path:find("AcceptNegotiation") then
-                    add_log("🔴 CRITICAL PATH: " .. remote_path, Color3.fromRGB(255, 50, 50))
+                -- INTERCEPT STRATEGY: Block GiveItem
+                if remote_name == "GiveItem" then
+                    add_log("🔴🔴🔴 BLOCKING: GiveItem", Color3.fromRGB(255, 0, 0))
+                    blocked_count = blocked_count + 1
+                    InterceptCount.Text = "Blocked: " .. blocked_count
+                    ItemsCount.Text = "BLOCKED: GiveItem"
+                    add_log("✓ Item transfer blocked", Color3.fromRGB(100, 255, 100))
+                    refresh_logs(ScrollFrame)
+                    return old_namecall(self)
+                end
 
-                    -- Block entire call by returning false or empty
-                    if #args > 0 then
+                -- INTERCEPT: Direct pet ID calls (outside of AddItemToOffer)
+                if type(args[1]) == "string" and args[1]:match("^%d+_[a-f0-9]{32}$") then
+                    if remote_name ~= "AddItemToOffer" and remote_name ~= "RemoveItemFromOffer" then
+                        add_log("🔴 BLOCKING: Direct pet ID on " .. remote_name, Color3.fromRGB(255, 100, 0))
                         blocked_count = blocked_count + 1
-                        InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                        ItemsCount.Text = "Last Intercept: BLOCKED"
-                        ItemsCount.TextColor3 = Color3.fromRGB(255, 100, 100)
-                        add_log("✓ CALL BLOCKED — no arguments sent", Color3.fromRGB(100, 255, 100))
+                        InterceptCount.Text = "Blocked: " .. blocked_count
+                        ItemsCount.Text = "BLOCKED: " .. remote_name
+                        add_log("✓ Pet transfer cancelled", Color3.fromRGB(100, 255, 100))
                         refresh_logs(ScrollFrame)
-
-                        -- Return early with empty args
                         return old_namecall(self)
                     end
                 end
 
-                if blocked then
-                    blocked_count = blocked_count + 1
-                    InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                    ItemsCount.Text = "Last Intercept: Pet ID removed"
-                    ItemsCount.TextColor3 = Color3.fromRGB(255, 100, 100)
-                    add_log("✓ PAYLOAD CLEARED", Color3.fromRGB(100, 255, 100))
-                    refresh_logs(ScrollFrame)
-                    return old_namecall(self, unpack(args))
-                end
+                refresh_logs(ScrollFrame)
             end
         end
 
