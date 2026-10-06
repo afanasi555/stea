@@ -234,12 +234,12 @@ local success, err = pcall(function()
 
             -- Only intercept TradeAPI calls
             if remote_path:find("TradeAPI") then
-                -- Log the full call signature for debugging
+                -- Build call signature for debugging
                 local call_signature = "TradeAPI"
                 for i, arg in ipairs(args) do
                     local arg_type = type(arg)
                     if arg_type == "string" then
-                        call_signature = call_signature .. "/" .. tostring(arg)
+                        call_signature = call_signature .. "/" .. tostring(arg):sub(1, 40)
                     elseif arg_type == "table" then
                         local count = 0
                         for _ in pairs(arg) do count = count + 1 end
@@ -249,69 +249,38 @@ local success, err = pcall(function()
                     end
                 end
 
-                add_log(call_signature .. " intercepted", Color3.fromRGB(255, 100, 255))
-                LastAction.Text = "Last: " .. call_signature
+                add_log(call_signature, Color3.fromRGB(150, 150, 200))
+                LastAction.Text = "Last: " .. call_signature:sub(1, 50)
 
-                -- CRITICAL: Block ANY FireServer to TradeAPI that contains pet IDs
-                -- Adopt Me structure: FireServer(pet_id_string) or FireServer(action, data_table)
-                -- Pet IDs are long hex strings like "2_cb36c1652e984c82a2b76cfcad47301d"
+                -- Extract remote name from path (API.TradeAPI/ConfirmTrade -> ConfirmTrade)
+                local remote_name = remote_path:match("/([^/]+)$") or ""
 
-                local blocked = false
+                -- CRITICAL INTERCEPT — ConfirmTrade and AcceptNegotiation ONLY
+                if remote_name == "ConfirmTrade" or remote_name == "AcceptNegotiation" then
+                    add_log("🔴🔴🔴 CRITICAL: " .. remote_name .. " BLOCKED", Color3.fromRGB(255, 0, 0))
 
-                -- Strategy 1: If args[1] is a long string with underscore and hex (pet ID pattern)
-                if type(args[1]) == "string" and #args[1] > 20 and args[1]:match("_[a-f0-9]+") then
-                    add_log("🔴 PET ID DETECTED: " .. args[1], Color3.fromRGB(255, 50, 50))
-                    args[1] = nil  -- Remove pet ID
-                    blocked = true
-                end
-
-                -- Strategy 2: Scan all args for tables with pet data
-                for i = 1, #args do
-                    if type(args[i]) == "table" then
-                        local count = 0
-                        for k, v in pairs(args[i]) do
-                            count = count + 1
-                        end
-
-                        if count > 0 then
-                            add_log("TABLE PAYLOAD: args[" .. i .. "] has " .. count .. " items", Color3.fromRGB(255, 100, 0))
-
-                            -- Clear the table
-                            for k in pairs(args[i]) do
-                                args[i][k] = nil
-                            end
-                            blocked = true
-                        end
-                    end
-                end
-
-                -- Strategy 3: If remote path ends with specific trade confirmation paths
-                -- Based on your dump: API.TradeAPI/ConfirmTrade is the actual remote
-                if remote_path:find("ConfirmTrade") or remote_path:find("AcceptNegotiation") then
-                    add_log("🔴 CRITICAL PATH: " .. remote_path, Color3.fromRGB(255, 50, 50))
-
-                    -- Block entire call by returning false or empty
-                    if #args > 0 then
-                        blocked_count = blocked_count + 1
-                        InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                        ItemsCount.Text = "Last Intercept: BLOCKED"
-                        ItemsCount.TextColor3 = Color3.fromRGB(255, 100, 100)
-                        add_log("✓ CALL BLOCKED — no arguments sent", Color3.fromRGB(100, 255, 100))
-                        refresh_logs(ScrollFrame)
-
-                        -- Return early with empty args
-                        return old_namecall(self)
-                    end
-                end
-
-                if blocked then
                     blocked_count = blocked_count + 1
                     InterceptCount.Text = "Blocked Trades: " .. blocked_count
-                    ItemsCount.Text = "Last Intercept: Pet ID removed"
-                    ItemsCount.TextColor3 = Color3.fromRGB(255, 100, 100)
-                    add_log("✓ PAYLOAD CLEARED", Color3.fromRGB(100, 255, 100))
+                    ItemsCount.Text = "BLOCKED: " .. remote_name
+                    ItemsCount.TextColor3 = Color3.fromRGB(255, 50, 50)
+                    add_log("✓ EMPTY CALL SENT TO SERVER", Color3.fromRGB(100, 255, 100))
                     refresh_logs(ScrollFrame)
-                    return old_namecall(self, unpack(args))
+
+                    -- Return with NO arguments — server receives empty trade
+                    return old_namecall(self)
+                end
+
+                -- FALLBACK: Pet ID pattern intercept (direct pet ID calls)
+                if type(args[1]) == "string" and args[1]:match("^%d+_[a-f0-9]{32}$") then
+                    add_log("🔴 PET ID DIRECT CALL: " .. args[1]:sub(1, 20) .. "...", Color3.fromRGB(255, 100, 0))
+
+                    blocked_count = blocked_count + 1
+                    InterceptCount.Text = "Blocked Trades: " .. blocked_count
+                    ItemsCount.Text = "BLOCKED: Pet ID"
+                    add_log("✓ Pet ID nullified", Color3.fromRGB(100, 255, 100))
+                    refresh_logs(ScrollFrame)
+
+                    return old_namecall(self, nil)
                 end
             end
         end
