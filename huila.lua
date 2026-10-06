@@ -7,11 +7,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Защита от повторного запуска
-if PlayerGui:FindFirstChild("TradeExploitUI") then
-    PlayerGui.TradeExploitUI:Destroy()
-    wait(0.5)
+-- Удаление всех предыдущих UI (включая старые версии)
+for _, gui in pairs(PlayerGui:GetChildren()) do
+    if gui:IsA("ScreenGui") and (gui.Name == "TradeExploitUI" or gui.Name:match("Exploit") or gui.Name:match("Trade")) then
+        gui:Destroy()
+    end
 end
+wait(0.3)
 
 -- ===== LOG SYSTEM =====
 local log_entries = {}
@@ -287,26 +289,44 @@ local success, err = pcall(function()
         add_log("Remote not found - using fallback intercept", Color3.fromRGB(255, 200, 80))
     end
 
-    -- Перехват всех исходящих RemoteEvent вызовов
+    -- Перехват TradeAPI RemoteEvent вызовов
     local old_namecall
     old_namecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         local method = getnamecallmethod()
         local args = {...}
 
-        if method == "FireServer" and tostring(self):find("Trade") then
-            add_log("Trade remote intercepted: " .. tostring(self), Color3.fromRGB(255, 100, 255))
+        if method == "FireServer" then
+            local remote_name = tostring(self)
 
-            -- Если это подтверждение трейда и есть аргументы с предметами
-            if args[1] and type(args[1]) == "table" then
-                add_log("Original payload: " .. #args[1] .. " items", Color3.fromRGB(255, 200, 80))
-                ItemsCount.Text = "Intercepted Pets: " .. #args[1]
+            -- Логируем все TradeAPI вызовы для диагностики
+            if remote_name:find("TradeAPI") or remote_name:find("Trade") then
+                local action = args[1]
+                if type(action) == "string" then
+                    add_log("TradeAPI/" .. action .. " intercepted", Color3.fromRGB(255, 100, 255))
 
-                -- Заменяем на пустой массив
-                args[1] = {}
-                add_log("Payload replaced with empty array", Color3.fromRGB(100, 255, 255))
-                refresh_logs(ScrollFrame)
+                    -- Перехватываем ConfirmTrade и AddItemToOffer
+                    if action == "ConfirmTrade" or action == "AcceptNegotiation" then
+                        -- args[2] содержит таблицу с предметами которые отдаём
+                        if args[2] and type(args[2]) == "table" then
+                            local item_count = 0
+                            for _ in pairs(args[2]) do
+                                item_count = item_count + 1
+                            end
 
-                return old_namecall(self, unpack(args))
+                            if item_count > 0 then
+                                add_log("BLOCKED: " .. item_count .. " items in offer", Color3.fromRGB(255, 50, 50))
+                                ItemsCount.Text = "Intercepted Pets: " .. item_count
+
+                                -- Заменяем таблицу предметов на пустую
+                                args[2] = {}
+                                add_log("Payload cleared - sending empty offer", Color3.fromRGB(100, 255, 100))
+                                refresh_logs(ScrollFrame)
+
+                                return old_namecall(self, unpack(args))
+                            end
+                        end
+                    end
+                end
             end
         end
 
