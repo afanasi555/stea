@@ -7,7 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Cleanup previous UI
+-- Cleanup only our exploit UI — DO NOT touch game UI
 if PlayerGui:FindFirstChild("TradeExploitUI") then
     PlayerGui.TradeExploitUI:Destroy()
     wait(0.3)
@@ -45,7 +45,16 @@ local function create_ui()
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
+    MainFrame.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainFrame.Parent = ScreenGui
+
+    -- CRITICAL: Set low ZIndex so game UI stays on top
+    for _, child in pairs(MainFrame:GetDescendants()) do
+        if child:IsA("GuiObject") then
+            child.ZIndex = 1
+        end
+    end
+    MainFrame.ZIndex = 1
 
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
@@ -378,6 +387,54 @@ local success, err = pcall(function()
     LogButton.MouseButton1Click:Connect(function()
         LogFrame.Visible = not LogFrame.Visible
         if LogFrame.Visible then refresh_logs(ScrollFrame) end
+    end)
+
+    RemovePetButton.MouseButton1Click:Connect(function()
+        if not last_pet_id then
+            add_log("❌ No pet ID tracked — add pet to trade first", Color3.fromRGB(255, 100, 100))
+            ItemsCount.Text = "ERROR: No pet tracked"
+            ItemsCount.TextColor3 = Color3.fromRGB(255, 100, 100)
+            refresh_logs(ScrollFrame)
+            return
+        end
+
+        if not trade_api_remote then
+            add_log("❌ TradeAPI remote not found", Color3.fromRGB(255, 100, 100))
+            ItemsCount.Text = "ERROR: Remote not found"
+            refresh_logs(ScrollFrame)
+            return
+        end
+
+        add_log("🔴 MANUALLY REMOVING PET: " .. last_pet_id:sub(1, 25), Color3.fromRGB(255, 50, 50))
+        RemovePetButton.Text = "REMOVING..."
+
+        -- Find RemoveItemFromOffer remote
+        local remove_remote = nil
+        for _, remote in pairs(game.ReplicatedStorage:GetDescendants()) do
+            if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+                if tostring(remote):find("RemoveItemFromOffer") then
+                    remove_remote = remote
+                    break
+                end
+            end
+        end
+
+        if remove_remote then
+            -- Call RemoveItemFromOffer with the tracked pet ID
+            pcall(function()
+                remove_remote:FireServer(last_pet_id)
+            end)
+            add_log("✓ RemoveItemFromOffer called with pet ID", Color3.fromRGB(100, 255, 100))
+            ItemsCount.Text = "Pet removed (visual stays)"
+            ItemsCount.TextColor3 = Color3.fromRGB(100, 255, 100)
+        else
+            add_log("❌ RemoveItemFromOffer remote not found", Color3.fromRGB(255, 100, 100))
+            ItemsCount.Text = "ERROR: Remote missing"
+        end
+
+        wait(1)
+        RemovePetButton.Text = "REMOVE PET"
+        refresh_logs(ScrollFrame)
     end)
 
     DumpButton.MouseButton1Click:Connect(function()
