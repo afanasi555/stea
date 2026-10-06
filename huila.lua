@@ -1,4 +1,4 @@
--- adopt_me_trade_exploit.lua v2
+-- adopt_me_trade_exploit.lua v23
 -- Updated for current Adopt Me build (October 2026)
 -- Trade path: ReplicatedStorage.adoptme_new_net.adoptme_new.modules.TradeHub
 
