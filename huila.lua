@@ -1,656 +1,346 @@
--- ============================================================
---  STEAL AN EGG — COMPLETE SCRIPT
---  Auto-collect (dynamic income) + Throw Aura + GUI
---  v2.0 | eldorado.gg index | сентябрь 2026
--- ============================================================
 
-local Players       = game:GetService("Players")
-local RunService    = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Workspace     = game:GetService("Workspace")
+-- adopt_me_trade_exploit.lua
+-- Trade Exploit Module - Sieno 1.3.60 Compatible
+-- Фикс: PlayerGui вместо CoreGui, отложенная инициализация UI
 
-local LocalPlayer   = Players.LocalPlayer
-local Mouse         = LocalPlayer:GetMouse()
 
--- ============================================================
---  СОСТОЯНИЕ
--- ============================================================
-local State = {
-    AutoCollect  = false,
-    ThrowAura    = false,
-    MinValue     = 1000,
-    ThrowRadius  = 30,
-    ThrowForce   = 120,
-    CollectDelay = 0.15,
-    Connections  = {},
-}
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- ============================================================
---  ПОЛНАЯ ТАБЛИЦА ПЕТОВ (160 шт, eldorado.gg, сен 2026)
---  Используется как ФОЛБЭК если живые данные недоступны
--- ============================================================
-local PET_VALUES = {
-    -- DIVINE
-    Aetheron             = 6900000000,
-    ArchAngel            = 5000000000,
-    WorldBurner          = 5000000000,
-    ShatteredColossus    = 3500000000,
-    Nightflame           = 3000000000,
-    Kitsune              = 1800000000,
-    Unicorn              = 1000000000,
-    Dreadscale           = 1000000000,
-    MechaDreadscale      = 1000000000,
-    Cthulhu              = 1000000000,
-    LuminousCthulhu      = 1000000000,
-    -- ETERNAL
-    Equinox              = 1800000000,
-    Pegasus              = 1300000000,
-    SkeletonHorse        = 1300000000,
-    GorillKing           = 880000000,
-    VoidSerpent          = 900000000,
-    ShatteredDrake       = 800000000,
-    WorldEater           = 500000000,
-    OniTiger             = 600000000,
-    EternalLunarDragon   = 250000000,
-    Mosasaurus           = 180000000,
-    ElMaja               = 130000000,
-    VoidDragon           = 120000000,
-    LavaDragon           = 100000000,
-    Phoenix              = 85000000,
-    IceDragon            = 65000000,
-    StrawberryElephant   = 65000000,
-    Krakenoid            = 65000000,
-    MechaKrakenoid       = 65000000,
-    TerraSnapper         = 65000000,
-    LuminousTerraSnapper = 65000000,
-    -- SECRET
-    EmberDragon          = 600000000,
-    Centaur              = 350000000,
-    RazorFang            = 350000000,
-    Stag                 = 145000000,
-    Shardwing            = 145000000,
-    MutantShark          = 215000000,
-    PureJellyfish        = 225000000,
-    Gargoyle             = 225000000,
-    Experiment001        = 285000000,
-    Tralaledon           = 32000000,
-    TRex                 = 25000000,
-    ScorchedDragon       = 35000000,
-    CosmicDragon         = 60000000,
-    CosmicSkeletonBoss   = 45000000,
-    Mawbreaker           = 60000000,
-    Kraken               = 15000000,
-    Wendigo              = 15000000,
-    Yeti                 = 5000000,
-    Cerberus             = 8000000,
-    KingSnake            = 3500000,
-    BomboclatCrocolat    = 3500000,
-    Crocodon             = 3500000,
-    MechaCrocodon        = 3500000,
-    ElectricEel          = 3500000,
-    LuminousElectricEel  = 3500000,
-    AbyssOverlord        = 100000000,
-    -- COSMIC
-    Koi                  = 12000000,
-    SnowyOwl             = 7500000,
-    Rhinotaur            = 17500000,
-    Mantaris             = 11000000,
-    SacredMoth           = 16000000,
-    HolyPeacock          = 25000000,
-    Imp                  = 16000000,
-    DemonHound           = 25000000,
-    LaVaccaSaturnoSaturnita = 2200000,
-    ShatteredRam         = 8000000,
-    Dreadclaw            = 2200000,
-    Ventinal             = 585000,
-    Drilla               = 100000000,
-    Nibbles013           = 185000,
-    Triceratops          = 1200000,
-    Bronto               = 1500000,
-    BelugaWhale          = 850000,
-    WhaleShark           = 700000,
-    KingMammoth          = 400000,
-    RoyalSphinx          = 280000,
-    Leviathan            = 220000,
-    MangoliniParrochini  = 220000,
-    Crawler              = 220000,
-    MechaCrawler         = 220000,
-    AbyssShark           = 220000,
-    LuminousAbyssShark   = 220000,
-    -- MYTHIC
-    WingedLamb           = 1250000,
-    Toro                 = 1250000,
-    Bladehide            = 750000,
-    RedPanda             = 450000,
-    Shardling            = 450000,
-    CosmicGorilla        = 180000,
-    Ankylosaurus         = 120000,
-    Orca                 = 80000,
-    ChillinChilli        = 55000,
-    Mammoth              = 42000,
-    SabertoothTiger      = 35000,
-    Tiger                = 28000,
-    Spider               = 22000,
-    Riftwing             = 220000,
-    Voidmaw              = 50000,
-    Scorpion             = 18500,
-    SandSpider           = 16000,
-    ShadowDragon         = 25000000,
-    BelulaBluga          = 20000,
-    Froggo               = 20000,
-    MechaFroggo          = 20000,
-    SpiritManta          = 20000,
-    LuminousSpiritManta  = 20000,
-    -- LEGENDARY
-    LightDove            = 225000,
-    FlameSprite          = 225000,
-    Crustacia            = 130000,
-    Spideron             = 95000,
-    Salamander           = 74000,
-    CosmicGecko          = 30000,
-    Pterodactyl          = 22000,
-    Shark                = 15000,
-    LavaIguana           = 11000,
-    FlamingBull          = 9500,
-    PolarBear            = 7000,
-    OrangutiniAnanassini = 5500,
-    BabyAuroraDragon     = 5000000,
-    Gorilla              = 4800,
-    Snake                = 3600,
-    Axolotl              = 2800,
-    BrrBrrPatapim        = 1800,
-    RiftEye              = 11000,
-    VoidAngler           = 30000,
-    Scorpio              = 5000,
-    MechaScorpio         = 5000,
-    Spike                = 5000,
-    LuminousSpike        = 5000,
-    -- EPIC
-    Crane                = 4000,
-    Centapede            = 1500,
-    Swordfish            = 1100,
-    LavaFrog             = 850,
-    Walrus               = 600,
-    Crocodile            = 420,
-    TobTobiTobTob        = 325,
-    Swan                 = 320,
-    TrulimeroTrulicina   = 260,
-    Bear                 = 240,
-    Fox                  = 180,
-    BananitaDolphinita   = 250,
-    -- RARE
-    Dodo                 = 280,
-    LavaGecko            = 180,
-    Parrotfish           = 220,
-    Penguin              = 140,
-    Toucan               = 110,
-    Chimpanzee           = 90,
-    Camel                = 75,
-    Turtle               = 60,
-    Raccoon              = 45,
-    Owl                  = 35,
-    TungTungSahur        = 40,
-    -- UNCOMMON
-    Fennec               = 18,
-    Catfish              = 12,
-    Bird                 = 8,
-    -- COMMON
-    Jerboa               = 6,
-    Duckling             = 4,
-    Frog                 = 3,
-    Dog                  = 2,
-    Chicken              = 1,
-}
+-- Защита от повторного запуска
+if PlayerGui:FindFirstChild("TradeExploitUI"
+    PlayerGui.TradeExploitUI:Destroy()
+    wait(0.5)
+end
 
--- ============================================================
---  ДИНАМИЧЕСКИЙ ДОХОД — читает живые данные из объекта
--- ============================================================
-local INCOME_ATTRS  = {"Income","MoneyPerSecond","Mps","Earnings","IncomePerSecond","Value","Money","Cash","EarningsPerSecond","Profit","Revenue"}
-local MUTATION_ATTRS= {"Multiplier","MutationMultiplier","Boost","IncomeMultiplier","Modifier","Multi"}
-local SIZE_MULT     = {tiny=0.5,small=0.75,normal=1,big=2,huge=4,giant=8}
+-- ===== LOG SYSTEM =====
+local log_entries = {}
+local max_logs = 50
 
-local function readAttr(obj, list)
-    for _, name in ipairs(list) do
-        local ok, v = pcall(function() return obj:GetAttribute(name) end)
-        if ok and type(v) == "number" and v > 0 then return v end
+local function add_log(message, color)
+    local timestamp = os.date("%H:%M:%S")
+    table.insert(log_entries, 1, {
+        time = timestamp,
+        text = message,
+        color = color or Color3.fromRGB(200,
+    })
+    if #log_entries > max_logs then
+        table.remove(log_entries, #log_entries)
     end
 end
 
-local function getRealIncome(obj)
-    -- 1. атрибуты
-    local v = readAttr(obj, INCOME_ATTRS)
-    if v then return v end
-    -- 2. NumberValue / IntValue в детях
-    for _, c in ipairs(obj:GetDescendants()) do
-        if c:IsA("NumberValue") or c:IsA("IntValue") then
-            for _, name in ipairs(INCOME_ATTRS) do
-                if c.Name:lower() == name:lower() and c.Value > 0 then
-                    return c.Value
+-- ===== MAIN UI CREATION =====
+local function create_ui()
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "TradeExploitUI"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBe
+    ScreenGui.IgnoreGuiInset = true
+    ScreenGui.Parent = PlayerGui
+
+    -- Main Frame
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "MainFrame"
+    MainFrame.Size = UDim2.new(0, 320, 0, 180)
+    MainFrame.Position = UDim2.new(0.5, -160
+    MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 28)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = ScreenGui
+
+    local Corner = Instance.new("UICorner")
+    Corner.CornerRadius = UDim.new(0, 8)
+    Corner.Parent = MainFrame
+
+    -- Header
+    local Header = Instance.new("TextLabel")
+    Header.Size = UDim2.new(1, 0, 0, 35)
+    Header.BackgroundColor3 = Color3.fromRGB
+    Header.BorderSizePixel = 0
+    Header.Text = "ADOPT ME EXPLOIT"
+    Header.TextColor3 = Color3.fromRGB(255, 70, 70)
+    Header.Font = Enum.Font.GothamBold
+    Header.TextSize = 14
+    Header.Parent = MainFrame
+
+    local HeaderCorner = Instance.new("UICor
+    HeaderCorner.CornerRadius = UDim.new(0, 8)
+    HeaderCorner.Parent = Header
+
+    -- Status Label
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Size = UDim2.new(1, -20, 0,
+    StatusLabel.Position = UDim2.new(0, 10, 0, 45)
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Text = "STATUS: ARMED"
+    StatusLabel.TextColor3 = Color3.fromRGB(
+    StatusLabel.Font = Enum.Font.GothamMedium
+    StatusLabel.TextSize = 12
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.Parent = MainFrame
+
+    -- Hook Status
+    local HookStatus = Instance.new("TextLabel")
+    HookStatus.Size = UDim2.new(1, -20, 0, 2
+    HookStatus.Position = UDim2.new(0, 10, 0, 75)
+    HookStatus.BackgroundTransparency = 1
+    HookStatus.Text = "Trade Hook: Inactive"
+    HookStatus.TextColor3 = Color3.fromRGB(1
+    HookStatus.Font = Enum.Font.Gotham
+    HookStatus.TextSize = 11
+    HookStatus.TextXAlignment = Enum.TextXAlignment.Left
+    HookStatus.Parent = MainFrame
+
+    -- Items Count
+    local ItemsCount = Instance.new("TextLabel")
+    ItemsCount.Size = UDim2.new(1, -20, 0, 2
+    ItemsCount.Position = UDim2.new(0, 10, 0, 95)
+    ItemsCount.BackgroundTransparency = 1
+    ItemsCount.Text = "Ghost Icons: 0"
+    ItemsCount.TextColor3 = Color3.fromRGB(1
+    ItemsCount.Font = Enum.Font.Gotham
+    ItemsCount.TextSize = 11
+    ItemsCount.TextXAlignment = Enum.TextXAlignment.Left
+    ItemsCount.Parent = MainFrame
+
+    -- Toggle Logs Button
+    local LogButton = Instance.new("TextButton")
+    LogButton.Size = UDim2.new(0, 140, 0, 32
+    LogButton.Position = UDim2.new(0, 10, 1, -42)
+    LogButton.BackgroundColor3 = Color3.from
+    LogButton.Text = "SHOW LOGS"
+    LogButton.TextColor3 = Color3.fromRGB(25
+    LogButton.Font = Enum.Font.GothamBold
+    LogButton.TextSize = 11
+    LogButton.Parent = MainFrame
+
+    local LogButtonCorner = Instance.new("UICorner")
+    LogButtonCorner.CornerRadius = UDim.new(
+    LogButtonCorner.Parent = LogButton
+
+    -- Close Button
+    local CloseButton = Instance.new("TextBu
+    CloseButton.Size = UDim2.new(0, 32, 0, 32)
+    CloseButton.Position = UDim2.new(1, -42,
+    CloseButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    CloseButton.Text = "X"
+    CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseButton.Font = Enum.Font.GothamBold
+    CloseButton.TextSize = 14
+    CloseButton.Parent = MainFrame
+
+    local CloseButtonCorner = Instance.new("
+    CloseButtonCorner.CornerRadius = UDim.new(0, 6)
+    CloseButtonCorner.Parent = CloseButton
+
+    -- ===== LOG WINDOW =====
+    local LogFrame = Instance.new("Frame")
+    LogFrame.Name = "LogFrame"
+    LogFrame.Size = UDim2.new(0, 420, 0, 300)
+    LogFrame.Position = UDim2.new(0.5, -210,
+    LogFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 23)
+    LogFrame.BorderSizePixel = 0
+    LogFrame.Visible = false
+    LogFrame.Active = true
+    LogFrame.Draggable = true
+    LogFrame.Parent = ScreenGui
+
+    local LogFrameCorner = Instance.new("UIC
+    LogFrameCorner.CornerRadius = UDim.new(0, 8)
+    LogFrameCorner.Parent = LogFrame
+
+    -- Log Header
+    local LogHeader = Instance.new("TextLabel")
+    LogHeader.Size = UDim2.new(1, 0, 0, 35)
+    LogHeader.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+    LogHeader.BorderSizePixel = 0
+    LogHeader.Text = "EXPLOIT LOGS"
+    LogHeader.TextColor3 = Color3.fromRGB(25
+    LogHeader.Font = Enum.Font.GothamBold
+    LogHeader.TextSize = 13
+    LogHeader.Parent = LogFrame
+
+    local LogHeaderCorner = Instance.new("UICorner")
+    LogHeaderCorner.CornerRadius = UDim.new(
+    LogHeaderCorner.Parent = LogHeader
+
+    -- Scroll Frame
+    local ScrollFrame = Instance.new("Scroll
+    ScrollFrame.Size = UDim2.new(1, -10, 1, -50)
+    ScrollFrame.Position = UDim2.new(0, 5, 0
+    ScrollFrame.BackgroundTransparency = 1
+    ScrollFrame.BorderSizePixel = 0
+    ScrollFrame.ScrollBarThickness = 6
+    ScrollFrame.Parent = LogFrame
+
+    local LogList = Instance.new("UIListLayo
+    LogList.SortOrder = Enum.SortOrder.LayoutOrder
+    LogList.Padding = UDim.new(0, 2)
+    LogList.Parent = ScrollFrame
+
+    -- Close Log Button
+    local CloseLogButton = Instance.new("Tex
+    CloseLogButton.Size = UDim2.new(0, 28, 0, 28)
+    CloseLogButton.Position = UDim2.new(1, -
+    CloseLogButton.BackgroundColor3 = Color3.fromRGB(255, 60, 60)
+    CloseLogButton.Text = "X"
+    CloseLogButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseLogButton.Font = Enum.Font.GothamBo
+    CloseLogButton.TextSize = 12
+    CloseLogButton.Parent = LogFrame
+
+    local CloseLogCorner = Instance.new("UIC
+    CloseLogCorner.CornerRadius = UDim.new(0, 5)
+    CloseLogCorner.Parent = CloseLogButton
+
+    return ScreenGui, MainFrame, LogFrame, SStatus, ItemsCount, LogButton, CloseButton,CloseLogButton
+end
+
+-- ===== LOG RENDERING =====
+local function refresh_logs(ScrollFrame)
+    for _, child in pairs(ScrollFrame:GetChi
+        if child:IsA("TextLabel") then
+            child:Destroy()
+        end
+    end
+
+    for i, entry in ipairs(log_entries) do
+        local LogEntry = Instance.new("TextLabel")
+        LogEntry.Size = UDim2.new(1, -10, 0,
+        LogEntry.BackgroundTransparency = 1
+        LogEntry.Text = "[" .. entry.time ..
+        LogEntry.TextColor3 = entry.color
+        LogEntry.Font = Enum.Font.Code
+        LogEntry.TextSize = 10
+        LogEntry.TextXAlignment = Enum.TextX
+        LogEntry.Parent = ScrollFrame
+    end
+
+    ScrollFrame.CanvasSize = UDim2.new(0, 0,
+end
+
+-- ===== MAIN EXECUTION =====
+add_log("Initializing exploit...", Color3.fr
+
+local success, err = pcall(function()
+    local ScreenGui, MainFrame, LogFrame, ScrollFrame, StatusLabel, HookStatus, ItemsCount, LogButton, CloseButton,
+CloseLogButton = create_ui()
+
+    add_log("UI created successfully", Color
+
+    -- Ждём загрузки трейд UI
+    local TradeUI = LocalPlayer.PlayerGui:WaitForChild("TradeGUI", 10)
+    if not TradeUI then
+        add_log("ERROR: TradeGUI not found", Color3.fromRGB(255, 80, 80))
+        return
+    end
+
+    local OfferContainer = TradeUI:WaitForChild("OfferContainer", 5)
+    if not OfferContainer then
+        add_log("ERROR: OfferContainer not found", Color3.fromRGB(255, 80, 80))
+        return
+    end
+
+    add_log("Trade UI hooked successfully", Color3.fromRGB(100, 255, 100))
+
+    -- ===== EXPLOIT LOGIC =====
+    local function hook_trade_accept()
+        add_log("Trade window opened - hook armed", Color3.fromRGB(100, 255, 100))
+        HookStatus.Text = "Trade Hook: Activ
+        HookStatus.TextColor3 = Color3.fromRGB(100, 255, 100)
+        refresh_logs(ScrollFrame)
+
+        local connection
+        connection = TradeUI.AcceptButton.MouseButton1Click:Connect(function()
+            add_log("Accept pressed - inject55, 200, 80))
+            refresh_logs(ScrollFrame)
+
+            local ghost_count = 0
+
+            for _, icon in pairs(OfferContainer:GetChildren()) do
+                if icon:IsA("ImageLabel") or
+                    local ghost_icon = icon:Clone()
+                    ghost_icon.Parent = Offe
+                    ghost_icon.Name = icon.Name .. "_ghost"
+                    ghost_icon.ZIndex = icon
+
+                    icon.Visible = false
+                    icon.Parent = nil
+                    ghost_count = ghost_coun
                 end
             end
-        end
-        if c:IsA("StringValue") then
-            for _, name in ipairs(INCOME_ATTRS) do
-                if c.Name:lower() == name:lower() then
-                    local n = tonumber(c.Value:match("[%d%.]+"))
-                    if n and n > 0 then return n end
-                end
-            end
-        end
-    end
-    -- 3. PrimaryPart атрибуты
-    if obj:IsA("Model") then
-        local root = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
-        if root then
-            local rv = readAttr(root, INCOME_ATTRS)
-            if rv then return rv end
-        end
-    end
-    return nil
-end
 
-local function getMutMult(obj)
-    local v = readAttr(obj, MUTATION_ATTRS)
-    if v and v > 1 then return v end
-    for _, c in ipairs(obj:GetDescendants()) do
-        if c:IsA("NumberValue") then
-            for _, name in ipairs(MUTATION_ATTRS) do
-                if c.Name:lower() == name:lower() and c.Value > 1 then return c.Value end
-            end
-        end
-    end
-    return 1
-end
+            ItemsCount.Text = "Ghost Icons:
+            add_log("Created " .. ghost_count .. " ghost icons", Color3.fromRGB(100, 255, 255))
+            refresh_logs(ScrollFrame)
 
-local function getSizeMult(obj)
-    local s
-    local ok, v = pcall(function() return obj:GetAttribute("Size") end)
-    if ok and type(v) == "string" then s = v:lower() end
-    if not s then
-        local sv = obj:FindFirstChild("Size")
-        if sv and sv:IsA("StringValue") then s = sv.Value:lower() end
-    end
-    if s then
-        for name, m in pairs(SIZE_MULT) do
-            if s:find(name) then return m end
-        end
-    end
-    return 1
-end
-
-local function getPetValueFallback(obj)
-    local raw = obj.Name:gsub("[%s%-_#]",""):lower()
-    local best = 0
-    for k, v in pairs(PET_VALUES) do
-        local key = k:lower()
-        if raw:find(key) or key:find(raw) then
-            if v > best then best = v end
-        end
-    end
-    return best
-end
-
-local function getEffectiveIncome(obj)
-    local live = getRealIncome(obj)
-    if live then
-        return live * getSizeMult(obj)
-    end
-    local base = getPetValueFallback(obj)
-    if base == 0 then return 0 end
-    return base * getMutMult(obj) * getSizeMult(obj)
-end
-
--- ============================================================
---  СБОР ЯИЦ — возвращает список отсортированный по доходу
--- ============================================================
-local SEARCH_FOLDERS = {"Eggs","Items","Collectibles","Map","Pets","Drops","Workspace"}
-
-local function getEggs()
-    local eggs, seen = {}, {}
-    for _, fname in ipairs(SEARCH_FOLDERS) do
-        local f = fname == "Workspace" and Workspace
-              or Workspace:FindFirstChild(fname, true)
-        if f then
-            for _, obj in ipairs(f:GetDescendants()) do
-                if not seen[obj]
-                    and (obj:IsA("BasePart") or obj:IsA("Model"))
-                    and not obj:FindFirstChildOfClass("Humanoid")
-                then
-                    local inc = getEffectiveIncome(obj)
-                    if inc >= State.MinValue then
-                        seen[obj] = true
-                        table.insert(eggs, {obj=obj, value=inc})
+            local trade_remote = ReplicatedSs")
+            if trade_remote then
+                local accept_remote = trade_)
+                if accept_remote then
+                    accept_remote = accept_r)
+                    if accept_remote then
+                        accept_remote:FireSe
+                        add_log("Empty payload sent", Color3.fromRGB(255, 100, 255))
+                        refresh_logs(ScrollF
                     end
                 end
             end
-        end
-    end
-    table.sort(eggs, function(a,b) return a.value > b.value end)
-    return eggs
-end
 
--- ============================================================
---  УТИЛИТЫ ДВИЖЕНИЯ
--- ============================================================
-local function getHRP()
-    local c = LocalPlayer.Character
-    return c and c:FindFirstChild("HumanoidRootPart")
-end
-
-local function walkTo(pos)
-    local c = LocalPlayer.Character
-    if not c then return end
-    local h = c:FindFirstChildOfClass("Humanoid")
-    if h then h:MoveTo(pos) end
-end
-
-local function objPos(obj)
-    if obj:IsA("Model") then
-        local p = obj.PrimaryPart or obj:FindFirstChildOfClass("BasePart")
-        return p and p.Position
-    elseif obj:IsA("BasePart") then
-        return obj.Position
-    end
-end
-
--- ============================================================
---  АВТО-СБОР
--- ============================================================
-local function startAutoCollect()
-    if State.Connections["collect"] then
-        State.Connections["collect"]:Disconnect()
-    end
-    local tick = 0
-    State.Connections["collect"] = RunService.Heartbeat:Connect(function(dt)
-        if not State.AutoCollect then return end
-        tick = tick + dt
-        if tick < State.CollectDelay then return end
-        tick = 0
-
-        local hrp = getHRP()
-        if not hrp then return end
-        local eggs = getEggs()
-        if #eggs == 0 then return end
-
-        local pos = objPos(eggs[1].obj)
-        if not pos then return end
-        if (hrp.Position - pos).Magnitude > 5 then
-            walkTo(pos)
-        end
-    end)
-end
-
--- ============================================================
---  ВЫКИДЫВАНИЕ АУРЫ
--- ============================================================
-local function throwNearby()
-    local hrp = getHRP()
-    if not hrp then return end
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local oh = p.Character:FindFirstChild("HumanoidRootPart")
-            if oh then
-                local dist = (hrp.Position - oh.Position).Magnitude
-                if dist <= State.ThrowRadius then
-                    local dir = (oh.Position - hrp.Position).Unit
-                    oh.Velocity = Vector3.new(
-                        dir.X * State.ThrowForce,
-                        State.ThrowForce * 1.5,
-                        dir.Z * State.ThrowForce
-                    )
-                    oh.CFrame = CFrame.new(oh.Position + Vector3.new(
-                        dir.X * 2000, 500, dir.Z * 2000
-                    ))
+            spawn(function()
+                wait(7)
+                for _, ghost in pairs(OfferContainer:GetChildren()) do
+                    if string.match(ghost.Na
+                        ghost:Destroy()
+                    end
                 end
-            end
-        end
+                add_log("Ghosts cleared", Co
+                ItemsCount.Text = "Ghost Icons: 0"
+                refresh_logs(ScrollFrame)
+            end)
+
+            connection:Disconnect()
+        end)
     end
-end
 
-local function startThrowAura()
-    if State.Connections["throw"] then
-        State.Connections["throw"]:Disconnect()
-    end
-    local tick = 0
-    State.Connections["throw"] = RunService.Heartbeat:Connect(function(dt)
-        if not State.ThrowAura then return end
-        tick = tick + dt
-        if tick < 0.5 then return end
-        tick = 0
-        throwNearby()
-    end)
-end
-
--- ============================================================
---  GUI
--- ============================================================
--- Чистим старый экземпляр если был
-local old = LocalPlayer.PlayerGui:FindFirstChild("SAE_Menu")
-if old then old:Destroy() end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name            = "SAE_Menu"
-ScreenGui.ResetOnSpawn    = false
-ScreenGui.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
-ScreenGui.Parent          = LocalPlayer.PlayerGui
-
--- Кнопка скрыть/показать
-local ToggleBtn = Instance.new("TextButton", ScreenGui)
-ToggleBtn.Size            = UDim2.new(0,36,0,36)
-ToggleBtn.Position        = UDim2.new(0,10,0.5,-18)
-ToggleBtn.BackgroundColor3= Color3.fromRGB(20,20,30)
-ToggleBtn.TextColor3      = Color3.fromRGB(255,220,80)
-ToggleBtn.Text            = "☰"
-ToggleBtn.Font            = Enum.Font.GothamBold
-ToggleBtn.TextSize        = 20
-Instance.new("UICorner",ToggleBtn).CornerRadius = UDim.new(0,8)
-
--- Главный фрейм
-local Frame = Instance.new("Frame", ScreenGui)
-Frame.Size              = UDim2.new(0,290,0,420)
-Frame.Position          = UDim2.new(0.5,-145,0.5,-210)
-Frame.BackgroundColor3  = Color3.fromRGB(14,14,22)
-Frame.BorderSizePixel   = 0
-Frame.ClipsDescendants  = true
-Instance.new("UICorner",Frame).CornerRadius = UDim.new(0,12)
-local stroke = Instance.new("UIStroke",Frame)
-stroke.Color     = Color3.fromRGB(80,60,200)
-stroke.Thickness = 1.5
-
--- Заголовок
-local Title = Instance.new("TextLabel", Frame)
-Title.Size             = UDim2.new(1,0,0,40)
-Title.BackgroundColor3 = Color3.fromRGB(25,15,55)
-Title.Text             = "  🥚  Steal an Egg v2.0"
-Title.Font             = Enum.Font.GothamBold
-Title.TextSize         = 14
-Title.TextColor3       = Color3.fromRGB(220,200,255)
-Title.TextXAlignment   = Enum.TextXAlignment.Left
-Instance.new("UICorner",Title).CornerRadius = UDim.new(0,12)
-
--- Layout + Padding
-local Layout = Instance.new("UIListLayout", Frame)
-Layout.SortOrder = Enum.SortOrder.LayoutOrder
-Layout.Padding   = UDim.new(0,6)
-local Pad = Instance.new("UIPadding", Frame)
-Pad.PaddingTop   = UDim.new(0,46)
-Pad.PaddingLeft  = UDim.new(0,10)
-Pad.PaddingRight = UDim.new(0,10)
-
--- ── Хелперы ──────────────────────────────────────────────────
-
-local function makeRow(parent, h)
-    local r = Instance.new("Frame", parent)
-    r.Size             = UDim2.new(1,0,0,h or 38)
-    r.BackgroundColor3 = Color3.fromRGB(22,22,36)
-    r.BorderSizePixel  = 0
-    Instance.new("UICorner",r).CornerRadius = UDim.new(0,8)
-    return r
-end
-
-local function makeLabel(parent, text, size)
-    local l = Instance.new("TextLabel", parent)
-    l.Size               = UDim2.new(0.72,0,1,0)
-    l.Position           = UDim2.new(0,10,0,0)
-    l.BackgroundTransparency = 1
-    l.Text               = text
-    l.Font               = Enum.Font.Gotham
-    l.TextSize           = size or 13
-    l.TextColor3         = Color3.fromRGB(200,200,220)
-    l.TextXAlignment     = Enum.TextXAlignment.Left
-    return l
-end
-
-local function makeToggle(labelText, stateKey, onEnable)
-    local row = makeRow(Frame, 38)
-    makeLabel(row, labelText)
-
-    local btn = Instance.new("TextButton", row)
-    btn.Size             = UDim2.new(0,52,0,24)
-    btn.Position         = UDim2.new(1,-62,0.5,-12)
-    btn.BackgroundColor3 = Color3.fromRGB(60,60,80)
-    btn.Text             = "OFF"
-    btn.Font             = Enum.Font.GothamBold
-    btn.TextSize         = 12
-    btn.TextColor3       = Color3.fromRGB(160,160,180)
-    Instance.new("UICorner",btn).CornerRadius = UDim.new(0,6)
-
-    btn.MouseButton1Click:Connect(function()
-        State[stateKey] = not State[stateKey]
-        if State[stateKey] then
-            btn.BackgroundColor3 = Color3.fromRGB(70,40,180)
-            btn.Text             = "ON"
-            btn.TextColor3       = Color3.fromRGB(220,200,255)
-            if onEnable then onEnable() end
+    TradeUI:GetPropertyChangedSignal("Visible"):Connect(function()
+        if TradeUI.Visible then
+            hook_trade_accept()
         else
-            btn.BackgroundColor3 = Color3.fromRGB(60,60,80)
-            btn.Text             = "OFF"
-            btn.TextColor3       = Color3.fromRGB(160,160,180)
+            HookStatus.Text = "Trade Hook: Inactive"
+            HookStatus.TextColor3 = Color3.f
+            add_log("Trade closed", Color3.fromRGB(150, 150, 150))
+            refresh_logs(ScrollFrame)
         end
     end)
-    return row
-end
 
-local function makeSlider(labelText, minV, maxV, defaultV, onChange)
-    local row = makeRow(Frame, 52)
-
-    local lbl = Instance.new("TextLabel", row)
-    lbl.Size             = UDim2.new(1,-10,0,20)
-    lbl.Position         = UDim2.new(0,10,0,4)
-    lbl.BackgroundTransparency = 1
-    lbl.Text             = labelText..": "..tostring(defaultV)
-    lbl.Font             = Enum.Font.Gotham
-    lbl.TextSize         = 12
-    lbl.TextColor3       = Color3.fromRGB(180,180,210)
-    lbl.TextXAlignment   = Enum.TextXAlignment.Left
-
-    local track = Instance.new("Frame", row)
-    track.Size             = UDim2.new(1,-20,0,8)
-    track.Position         = UDim2.new(0,10,0,32)
-    track.BackgroundColor3 = Color3.fromRGB(40,40,60)
-    Instance.new("UICorner",track).CornerRadius = UDim.new(0,4)
-
-    local fill = Instance.new("Frame", track)
-    fill.Size             = UDim2.new((defaultV-minV)/(maxV-minV),0,1,0)
-    fill.BackgroundColor3 = Color3.fromRGB(100,70,220)
-    Instance.new("UICorner",fill).CornerRadius = UDim.new(0,4)
-
-    local knob = Instance.new("TextButton", track)
-    knob.Size             = UDim2.new(0,16,0,16)
-    knob.Position         = UDim2.new((defaultV-minV)/(maxV-minV),-8,0.5,-8)
-    knob.BackgroundColor3 = Color3.fromRGB(180,140,255)
-    knob.Text             = ""
-    Instance.new("UICorner",knob).CornerRadius = UDim.new(0,8)
-
-    local dragging = false
-    knob.MouseButton1Down:Connect(function() dragging = true end)
-    UserInputService.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if dragging and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local abs  = track.AbsolutePosition
-            local sz   = track.AbsoluteSize
-            local rel  = math.clamp((i.Position.X - abs.X) / sz.X, 0, 1)
-            local val  = math.floor(minV + rel*(maxV-minV))
-            fill.Size  = UDim2.new(rel,0,1,0)
-            knob.Position = UDim2.new(rel,-8,0.5,-8)
-            lbl.Text   = labelText..": "..tostring(val)
-            if onChange then onChange(val) end
+    -- ===== BUTTON ACTIONS =====
+    LogButton.MouseButton1Click:Connect(function()
+        LogFrame.Visible = not LogFrame.Visi
+        LogButton.Text = LogFrame.Visible and "HIDE LOGS" or "SHOW LOGS"
+        if LogFrame.Visible then
+            refresh_logs(ScrollFrame)
         end
     end)
-end
 
--- ── Строим меню ───────────────────────────────────────────────
-
-makeToggle("🥚  Авто-сбор (лучший пет)", "AutoCollect", startAutoCollect)
-makeToggle("💫  Выкидывание ауры",        "ThrowAura",   startThrowAura)
-
-makeSlider("Мин. доход ($/сек)", 0, 1000000, State.MinValue, function(v)
-    State.MinValue = v
-end)
-makeSlider("Радиус ауры (студдов)", 5, 150, State.ThrowRadius, function(v)
-    State.ThrowRadius = v
-end)
-makeSlider("Сила броска", 50, 300, State.ThrowForce, function(v)
-    State.ThrowForce = v
-end)
-
--- Статус
-local StatusRow = makeRow(Frame, 28)
-local StatusLbl = Instance.new("TextLabel", StatusRow)
-StatusLbl.Size               = UDim2.new(1,-10,1,0)
-StatusLbl.Position           = UDim2.new(0,10,0,0)
-StatusLbl.BackgroundTransparency = 1
-StatusLbl.Text               = "Статус: ожидание"
-StatusLbl.Font               = Enum.Font.Gotham
-StatusLbl.TextSize           = 11
-StatusLbl.TextColor3         = Color3.fromRGB(120,120,150)
-StatusLbl.TextXAlignment     = Enum.TextXAlignment.Left
-
--- Живой статус
-RunService.Heartbeat:Connect(function()
-    local parts = {}
-    if State.AutoCollect then table.insert(parts,"Сбор ✓") end
-    if State.ThrowAura   then table.insert(parts,"Аура ✓") end
-    StatusLbl.Text = "Статус: "..(#parts>0 and table.concat(parts," | ") or "ожидание")
-end)
-
--- ── Перетаскивание ────────────────────────────────────────────
-local function makeDraggable(frame, handle)
-    local drag, ds, sp = false
-    handle.InputBegan:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then
-            drag = true; ds = i.Position; sp = frame.Position
-        end
+    CloseButton.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+        add_log("Exploit unloaded", Color3.fromRGB(255, 80, 80))
     end)
-    handle.InputEnded:Connect(function(i)
-        if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end
-    end)
-    UserInputService.InputChanged:Connect(function(i)
-        if drag and i.UserInputType == Enum.UserInputType.MouseMovement then
-            local d = i.Position - ds
-            frame.Position = UDim2.new(
-                sp.X.Scale, sp.X.Offset + d.X,
-                sp.Y.Scale, sp.Y.Offset + d.Y
-            )
-        end
-    end)
-end
 
-makeDraggable(Frame,     Title)
-makeDraggable(ToggleBtn, ToggleBtn)
+    CloseLogButton.MouseButton1Click:Connect
+        LogFrame.Visible = false
+        LogButton.Text = "SHOW LOGS"
+    end)
 
--- ── Скрыть / показать ─────────────────────────────────────────
-local visible = true
-ToggleBtn.MouseButton1Click:Connect(function()
-    visible = not visible
-    Frame.Visible = visible
-    ToggleBtn.Text = visible and "✕" or "☰"
+    StatusLabel.Text = "STATUS: ARMED | READY"
+    add_log("Exploit ready - waiting for tra 100))
+    refresh_logs(ScrollFrame)
 end)
 
--- ============================================================
---  ЗАПУСК
--- ============================================================
-startAutoCollect()
-startThrowAura()
+if not success then
+    warn("[EXPLOIT ERROR] " .. tostring(err))
+    add_log("FATAL: " .. tostring(err), Colo
+end       
