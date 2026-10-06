@@ -1,4 +1,4 @@
--- adopt_me_trade_exploit.lua v103
+-- adopt_me_trade_exploit.lua v104
 -- Updated: 2026-10-07 | Visual pet removal strategy
 -- Method: RemoveItemFromOffer after AddItemToOffer with UI preservation
 
@@ -244,6 +244,8 @@ local success, err = pcall(function()
     local blocked_count = 0
     local last_pet_id = nil  -- Track last added pet ID
     local trade_api_remote = nil  -- Store TradeAPI remote reference
+    local hook_enabled = true  -- Control hook state
+    local trade_window_opened = false  -- Track if trade window opened
 
     -- ===== METAMETHOD HOOK — FULL DIAGNOSTIC LOGGING =====
     local old_namecall
@@ -264,6 +266,33 @@ local success, err = pcall(function()
                 -- Extract remote name
                 local remote_name = remote_path:match("/([^/]+)$") or "Unknown"
 
+                -- BYPASS: After AcceptOrDeclineTradeRequest, let all calls through for 5 seconds
+                if remote_name == "AcceptOrDeclineTradeRequest" then
+                    add_log("⚠️ BYPASS: Disabling hook for 5s to allow trade window", Color3.fromRGB(255, 200, 0))
+                    hook_enabled = false
+                    spawn(function()
+                        wait(5)
+                        hook_enabled = true
+                        trade_window_opened = true
+                        add_log("✓ Hook re-enabled", Color3.fromRGB(100, 255, 100))
+                        refresh_logs(ScrollFrame)
+                    end)
+                end
+
+                -- If hook disabled, pass everything through with logging only
+                if not hook_enabled then
+                    local call_sig = remote_name
+                    for i, arg in ipairs(args) do
+                        if type(arg) == "string" then
+                            call_sig = call_sig .. "/" .. tostring(arg):sub(1, 20)
+                        elseif type(arg) == "table" then
+                            call_sig = call_sig .. "/[table]"
+                        end
+                    end
+                    add_log("🔓 BYPASS: " .. call_sig, Color3.fromRGB(200, 200, 100))
+                    return old_namecall(self, ...)
+                end
+
                 -- Track pet IDs from AddItemToOffer
                 if remote_name == "AddItemToOffer" then
                     for i, arg in ipairs(args) do
@@ -281,7 +310,7 @@ local success, err = pcall(function()
                     end
                 end
 
-                -- Build FULL call signature with remote name
+                -- Build call signature
                 local call_signature = remote_name
                 local detailed_args = {}
 
@@ -289,7 +318,6 @@ local success, err = pcall(function()
                     local arg_type = type(arg)
                     if arg_type == "string" then
                         local arg_str = tostring(arg)
-                        -- Truncate long strings but show full pet IDs
                         if arg_str:match("^%d+_[a-f0-9]+$") then
                             call_signature = call_signature .. "/PetID:" .. arg_str:sub(1, 15) .. "..."
                             table.insert(detailed_args, "PetID: " .. arg_str)
@@ -330,14 +358,14 @@ local success, err = pcall(function()
                 add_log(call_signature, log_color)
                 LastAction.Text = "Last: " .. remote_name
 
-                -- Log detailed args if they exist
+                -- Log detailed args
                 if #detailed_args > 0 then
                     for _, detail in ipairs(detailed_args) do
                         add_log("  └─ " .. detail, Color3.fromRGB(120, 120, 150))
                     end
                 end
 
-                -- INTERCEPT STRATEGY: Block GiveItem
+                -- Block GiveItem
                 if remote_name == "GiveItem" then
                     add_log("🔴🔴🔴 BLOCKING: GiveItem", Color3.fromRGB(255, 0, 0))
                     blocked_count = blocked_count + 1
@@ -348,7 +376,7 @@ local success, err = pcall(function()
                     return old_namecall(self)
                 end
 
-                -- INTERCEPT: Direct pet ID calls (outside of AddItemToOffer)
+                -- Block direct pet ID calls
                 if type(args[1]) == "string" and args[1]:match("^%d+_[a-f0-9]{32}$") then
                     if remote_name ~= "AddItemToOffer" and remote_name ~= "RemoveItemFromOffer" then
                         add_log("🔴 BLOCKING: Direct pet ID on " .. remote_name, Color3.fromRGB(255, 100, 0))
