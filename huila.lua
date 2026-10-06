@@ -1,4 +1,4 @@
--- adopt_me_trade_exploit.lua v10
+-- adopt_me_trade_exploit.lua v103
 -- Updated: 2026-10-07 | Visual pet removal strategy
 -- Method: RemoveItemFromOffer after AddItemToOffer with UI preservation
 
@@ -45,16 +45,7 @@ local function create_ui()
     MainFrame.BorderSizePixel = 0
     MainFrame.Active = true
     MainFrame.Draggable = true
-    MainFrame.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     MainFrame.Parent = ScreenGui
-
-    -- CRITICAL: Set low ZIndex so game UI stays on top
-    for _, child in pairs(MainFrame:GetDescendants()) do
-        if child:IsA("GuiObject") then
-            child.ZIndex = 1
-        end
-    end
-    MainFrame.ZIndex = 1
 
     Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
 
